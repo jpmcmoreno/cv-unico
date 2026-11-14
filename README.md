@@ -9,7 +9,7 @@ abre una demo de este sitio.
 | Regresión lineal | `demos/regresion/` | Mínimos cuadrados en tiempo real |
 | Clasificación | `demos/clasificador/` | Regresión logística y frontera de decisión |
 | Clustering | `demos/clusters/` | K-means paso a paso |
-| Web scraping de noticias | `demos/scraping/` | Selectores CSS al estilo Scrapy |
+| Web scraping de noticias | `demos/scraping/` | De páginas distintas a datos ordenados |
 | Euclides, Proposición I.1 | `demos/euclides/` | Herramienta didáctica interactiva |
 
 Todo es HTML, CSS y JavaScript sin frameworks ni dependencias: no hay nada que instalar ni compilar.

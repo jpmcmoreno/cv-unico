@@ -4,33 +4,54 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Web scraping de noticias · Demo de Juan Pablo Moreno</title>
-<meta name="description" content="Escribe selectores CSS al estilo Scrapy y mira qué datos se extraen de una página de noticias de ejemplo.">
+<meta name="description" content="Mira cómo tres páginas de noticias armadas de forma distinta se convierten en los mismos datos ordenados.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2314213d'/%3E%3Cpath d='M12 9l11 7-11 7z' fill='%23e4572e'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="../../assets/style.css">
 <style>
-  .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; margin: 22px 0 18px; align-items: start; }
+  .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; margin: 22px 0 36px; align-items: start; }
   @media (max-width: 860px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
-  .tabs { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; align-items: center; }
-  iframe.pagina { width: 100%; height: 400px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
-  pre.fuente { max-height: 400px; overflow: auto; white-space: pre; }
-  .sel { display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 8px; align-items: center; margin-bottom: 8px; }
-  .sel label { font-size: 13.5px; font-weight: 600; }
-  .sel input {
-    width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
-    font-family: var(--mono); font-size: 13.5px; color: var(--ink); background: #fbfaf7;
+  .fila { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  .seg button { padding: 7px 12px; font-size: 13.5px; }
+
+  /* Marco de navegador alrededor de la página de ejemplo */
+  .navegador { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
+  .navegador .barra { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #e9e6df; }
+  .navegador .luces { display: flex; gap: 5px; }
+  .navegador .luces i { width: 10px; height: 10px; border-radius: 50%; background: #c9c4b8; display: block; }
+  .navegador .url { flex: 1; background: #fff; border-radius: 999px; padding: 3px 12px; font-family: var(--mono); font-size: 12px; color: var(--soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vista { height: 440px; overflow-y: auto; position: relative; scroll-behavior: smooth; }
+  .formato { font-size: 13.5px; color: var(--soft); margin: 8px 2px 0; }
+
+  /* Qué sacar: un botón por dato, con su color */
+  .campos { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .campo {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1.5px solid var(--line); background: #fff; border-radius: 999px; padding: 6px 12px;
+    font: inherit; font-size: 14px; font-weight: 600; color: var(--soft); cursor: pointer;
   }
-  .sel input.mal { border-color: var(--accent); background: #fdeee9; }
-  .aviso { font-size: 13.5px; margin: 6px 0 0; min-height: 1.4em; }
-  .aviso.error { color: var(--accent-dark); font-weight: 600; }
-  .aviso.ok { color: var(--teal); font-weight: 600; }
-  .tabla-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
-  table.res { border-collapse: collapse; width: 100%; font-size: 13.5px; background: #fff; }
-  table.res th, table.res td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  table.res th { background: var(--paper); font-family: var(--mono); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--soft); }
-  table.res tr:last-child td { border-bottom: 0; }
-  table.res td.vacio { color: var(--accent-dark); font-style: italic; }
-  .bloque { margin-bottom: 18px; }
-  .bloque h2 { margin-top: 0; }
+  .campo i { width: 11px; height: 11px; border-radius: 3px; display: block; background: var(--c); opacity: .35; }
+  .campo[aria-pressed="true"] { color: var(--ink); border-color: var(--c); background: color-mix(in srgb, var(--c) 10%, #fff); }
+  .campo[aria-pressed="true"] i { opacity: 1; }
+
+  .stats3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0 4px; }
+
+  /* Resultado */
+  .resultado { display: flex; flex-direction: column; gap: 8px; max-height: 420px; overflow-y: auto; padding: 2px; }
+  .tarj {
+    border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px; padding: 9px 12px;
+    background: #fff; animation: entra .35s ease both; cursor: default;
+  }
+  .tarj.foco { background: #fdf3ef; border-color: var(--accent); }
+  .tarj .n { font-family: var(--mono); font-size: 11.5px; color: var(--soft); }
+  .tarj .t { font-weight: 600; font-size: 15px; line-height: 1.3; margin: 1px 0 5px; }
+  .tarj .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip { font-size: 12.5px; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--c) 16%, #fff); border: 1px solid color-mix(in srgb, var(--c) 45%, #fff); }
+  .chip.mono { font-family: var(--mono); font-size: 11.5px; overflow-wrap: anywhere; }
+  .chip small { color: var(--soft); }
+  @keyframes entra { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .tarj { animation: none; } .vista { scroll-behavior: auto; } }
+  .vacio { color: var(--soft); font-size: 14.5px; padding: 26px 10px; text-align: center; border: 1.5px dashed var(--line); border-radius: 8px; }
+  pre.json { max-height: 420px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
 </style>
 </head>
 <body>
@@ -43,63 +64,63 @@
   <header class="demo-head">
     <div class="kicker">Demo · Automatización</div>
     <h1>Web scraping de noticias</h1>
-    <p>Cada medio organiza su página de una forma distinta. El trabajo está en encontrar los selectores que sacan el titular, el enlace y la fecha de cada nota. Aquí puedes escribirlos, romperlos y ver el resultado al instante.</p>
-    <p class="respaldo"><b>Lo que la respalda:</b> en Risk Consulting Global Group construí una automatización en Python, desplegada en la plataforma interna, que recolecta noticias con web scraping y consumo de una API externa.</p>
+    <p>Cada medio arma su página a su manera: listas, tarjetas, fechas escritas de tres formas, publicidad en la mitad. Un scraper las recorre y entrega siempre lo mismo: datos limpios y ordenados. Dale a <em>Extraer</em> y míralo trabajar.</p>
+    <p class="respaldo"><b>Lo que la respalda:</b> en Risk Consulting Global Group automaticé con Python la recolección de noticias de distintas fuentes.</p>
   </header>
 
   <section class="grid2">
     <div class="panel">
-      <h2>1 · La página a leer</h2>
-      <div class="tabs">
-        <div class="seg" role="group" aria-label="Medio de ejemplo">
-          <button id="medio0" aria-pressed="true">El Faro Andino</button>
-          <button id="medio1" aria-pressed="false">Radio Sabana</button>
-        </div>
-        <div class="seg" role="group" aria-label="Vista">
-          <button id="vistaPag" aria-pressed="true">Página</button>
-          <button id="vistaSrc" aria-pressed="false">HTML</button>
-        </div>
+      <h2>1 · La página</h2>
+      <div class="fila">
+        <div class="seg" role="group" aria-label="Medio de ejemplo" id="medios"></div>
       </div>
-      <iframe class="pagina" id="pagina" sandbox="" title="Página de noticias de ejemplo"></iframe>
-      <pre class="code fuente" id="fuente" hidden></pre>
-      <p class="hint">Son dos medios inventados para esta demo: las noticias no son reales. Tienen estructuras distintas a propósito.</p>
+      <div class="navegador">
+        <div class="barra">
+          <span class="luces"><i></i><i></i><i></i></span>
+          <span class="url" id="url"></span>
+        </div>
+        <div class="vista" id="vista"><div id="host"></div></div>
+      </div>
+      <p class="formato" id="formato"></p>
+      <p class="hint" style="margin-left:2px">Son medios inventados para esta demo: las noticias no son reales.</p>
     </div>
 
     <div class="panel">
-      <h2>2 · Los selectores</h2>
-      <div class="sel"><label for="sItem">Cada nota</label><input id="sItem" spellcheck="false" autocomplete="off"></div>
-      <div class="sel"><label for="sTitulo">Titular</label><input id="sTitulo" spellcheck="false" autocomplete="off"></div>
-      <div class="sel"><label for="sEnlace">Enlace</label><input id="sEnlace" spellcheck="false" autocomplete="off"></div>
-      <div class="sel"><label for="sFecha">Fecha</label><input id="sFecha" spellcheck="false" autocomplete="off"></div>
-      <div class="sel"><label for="sSeccion">Sección</label><input id="sSeccion" spellcheck="false" autocomplete="off"></div>
-      <div class="btn-row" style="margin-top:12px">
-        <button class="btn primary" id="resolver">Poner los correctos</button>
-        <button class="btn" id="limpiar">Empezar en blanco</button>
+      <h2>2 · Qué sacar</h2>
+      <div class="campos" id="campos">
+        <button class="campo" data-campo="titular" style="--c:#2a9d8f" aria-pressed="true"><i></i>Titular</button>
+        <button class="campo" data-campo="fecha" style="--c:#e9a23b" aria-pressed="true"><i></i>Fecha</button>
+        <button class="campo" data-campo="seccion" style="--c:#7b5ea7" aria-pressed="true"><i></i>Sección</button>
+        <button class="campo" data-campo="enlace" style="--c:#3a6ea5" aria-pressed="false"><i></i>Enlace</button>
       </div>
-      <p class="aviso" id="aviso" role="status"></p>
-      <p class="hint" style="margin-left:0">Sintaxis de Scrapy: <code>::text</code> saca el texto y <code>::attr(href)</code> un atributo. Los cuatro últimos selectores se buscan dentro de cada nota.</p>
-    </div>
-  </section>
+      <div class="btn-row">
+        <button class="btn primary" id="extraer">Extraer noticias</button>
+        <button class="btn" id="limpiar">Limpiar</button>
+      </div>
 
-  <section class="panel bloque">
-    <h2>3 · Lo que se extrae</h2>
-    <div class="tabla-wrap">
-      <table class="res">
-        <thead><tr><th>#</th><th>titular</th><th>enlace</th><th>fecha</th><th>seccion</th></tr></thead>
-        <tbody id="filas"></tbody>
-      </table>
-    </div>
-  </section>
+      <div class="stats3">
+        <div class="stat"><div class="k">Noticias</div><div class="v" id="sNotas">0</div></div>
+        <div class="stat"><div class="k">Datos</div><div class="v" id="sDatos">0</div></div>
+        <div class="stat"><div class="k">Ruido ignorado</div><div class="v" id="sRuido">0</div></div>
+      </div>
 
-  <section class="panel bloque">
-    <h2>4 · El mismo scraper en Scrapy</h2>
-    <pre class="code" id="codigo"></pre>
+      <h2>3 · Datos ordenados</h2>
+      <div class="fila">
+        <div class="seg" role="group" aria-label="Formato del resultado">
+          <button id="verTarjetas" aria-pressed="true">Tarjetas</button>
+          <button id="verJson" aria-pressed="false">JSON</button>
+        </div>
+      </div>
+      <div class="resultado" id="resultado" aria-live="polite"></div>
+      <pre class="code json" id="json" hidden></pre>
+    </div>
   </section>
 
   <section class="how">
     <h2>Cómo funciona</h2>
-    <p>El navegador analiza el HTML de ejemplo y aplica tus selectores con <code>querySelectorAll</code>, igual que Scrapy aplica <code>response.css()</code> sobre la respuesta de un servidor. El bloque de código muestra el <em>spider</em> equivalente con los selectores que tengas escritos en ese momento.</p>
-    <p>Dos diferencias con un scraper real: esta demo lee una página guardada en lugar de pedirla por la red (un navegador no puede leer otros sitios por seguridad), y <code>::text</code> aquí devuelve todo el texto del elemento, mientras que en Scrapy devuelve solo el texto directo. El código de la empresa no se publica; esto muestra la técnica.</p>
+    <p>Para cada medio hay un pequeño «mapa» que dice dónde está cada dato dentro de su página. El extractor recorre las noticias una por una, toma lo que el mapa le indica y deja por fuera lo que no es noticia, como la publicidad.</p>
+    <p>Después viene la limpieza. Fíjate en las fechas: un medio escribe «12 de noviembre de 2026», otro «hace 2 horas» y otro «13/11/2026», pero en el resultado todas quedan en el mismo formato. Pasa el cursor por una tarjeta para ver de qué parte de la página salió.</p>
+    <p>Es una versión simplificada, con páginas guardadas dentro de la propia demo: muestra la idea, no el sistema de ninguna empresa.</p>
   </section>
 </main>
 
@@ -108,109 +129,205 @@
 <script src="scraping.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
-const CAMPOS = ["sItem", "sTitulo", "sEnlace", "sFecha", "sSeccion"];
+const CAMPOS = ["titular", "fecha", "seccion", "enlace"];
+const COLOR = { titular: "#2a9d8f", fecha: "#e9a23b", seccion: "#7b5ea7", enlace: "#3a6ea5" };
+const sinAnimacion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const raiz = $("host").attachShadow({ mode: "open" });
 let medio = 0;
+let filas = [];        // todas las noticias de la página actual
+let mostradas = 0;     // cuántas ha "extraído" ya la animación
+let turno = 0;         // identifica la animación en curso para poder cancelarla
 
-function leerSelectores() {
-  return {
-    item: $("sItem").value,
-    titular: $("sTitulo").value,
-    enlace: $("sEnlace").value,
-    fecha: $("sFecha").value,
-    seccion: $("sSeccion").value,
-  };
-}
+const activos = () => CAMPOS.filter((c) => document.querySelector(`[data-campo="${c}"]`).getAttribute("aria-pressed") === "true");
+const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
-function ponerSelectores(s) {
-  $("sItem").value = s.item;
-  $("sTitulo").value = s.titular;
-  $("sEnlace").value = s.enlace;
-  $("sFecha").value = s.fecha;
-  $("sSeccion").value = s.seccion;
-  correr();
-}
-
-function correr() {
-  const sel = leerSelectores();
-  const doc = new DOMParser().parseFromString(MEDIOS[medio].html, "text/html");
-  const r = extraerNoticias(doc, sel);
-
-  const mapa = { item: "sItem", titular: "sTitulo", enlace: "sEnlace", fecha: "sFecha", seccion: "sSeccion" };
-  for (const id of CAMPOS) $(id).classList.remove("mal");
-  for (const campo of r.invalidos) $(mapa[campo]).classList.add("mal");
-
-  const cuerpo = $("filas");
-  cuerpo.replaceChildren();
-  r.filas.forEach((f, i) => {
-    const tr = document.createElement("tr");
-    const celdas = [String(i + 1), f.titular, f.enlace, f.fecha, f.seccion];
-    celdas.forEach((v, j) => {
-      const td = document.createElement("td");
-      if (v === null || v === "") { td.textContent = "sin dato"; td.className = "vacio"; }
-      else td.textContent = v;
-      if (j === 0) td.className = "";
-      tr.appendChild(td);
-    });
-    cuerpo.appendChild(tr);
-  });
-  if (!r.filas.length) {
-    const tr = document.createElement("tr");
-    const td = document.createElement("td");
-    td.colSpan = 5;
-    td.className = "vacio";
-    td.textContent = "Todavía no se extrae ninguna nota.";
-    tr.appendChild(td);
-    cuerpo.appendChild(tr);
-  }
-
-  const aviso = $("aviso");
-  const total = MEDIOS[medio].total;
-  const completas = r.filas.filter((f) => f.titular && f.enlace && f.fecha && f.seccion).length;
-  if (r.invalidos.length) {
-    aviso.className = "aviso error";
-    aviso.textContent = "Hay un selector con sintaxis inválida (marcado en rojo).";
-  } else if (!sel.item.trim()) {
-    aviso.className = "aviso";
-    aviso.textContent = "Escribe el selector que identifica cada nota.";
-  } else if (r.filas.length === total && completas === total) {
-    aviso.className = "aviso ok";
-    aviso.textContent = `Listo: ${total} de ${total} notas con todos sus campos.`;
-  } else {
-    aviso.className = "aviso";
-    aviso.textContent = `${r.filas.length} elementos encontrados, ${completas} con todos los campos. La página tiene ${total} notas.`;
-  }
-
-  $("codigo").textContent = codigoScrapy(MEDIOS[medio], sel);
-}
-
-function elegirMedio(i) {
+function cargarMedio(i) {
+  turno++;
   medio = i;
-  $("medio0").setAttribute("aria-pressed", String(i === 0));
-  $("medio1").setAttribute("aria-pressed", String(i === 1));
-  $("pagina").srcdoc = MEDIOS[i].html;
-  $("fuente").textContent = MEDIOS[i].html.trim();
-  ponerSelectores(MEDIOS[i].solucion);
+  const m = MEDIOS[i];
+  raiz.innerHTML = `<style>${ESTILO_BASE}${m.css}</style>${m.cuerpo}`;
+  // Los enlaces de la página de ejemplo no llevan a ningún lado.
+  raiz.querySelectorAll("a").forEach((a) => a.addEventListener("click", (e) => e.preventDefault()));
+  filas = extraerNoticias(raiz, m);
+  filas.forEach((f, n) => {
+    f.origen.item.classList.add("x-item");
+    f.origen.item.addEventListener("mouseenter", () => enfocar(n, true, false));
+    f.origen.item.addEventListener("mouseleave", () => enfocar(n, false, false));
+  });
+  mostradas = 0;
+  $("url").textContent = `https://${m.dominio}/`;
+  $("formato").textContent = m.formato;
+  $("vista").scrollTop = 0;
+  document.querySelectorAll("#medios button").forEach((b, j) => b.setAttribute("aria-pressed", String(j === i)));
+  $("extraer").disabled = false;
+  pintar();
 }
 
-function elegirVista(src) {
-  $("vistaPag").setAttribute("aria-pressed", String(!src));
-  $("vistaSrc").setAttribute("aria-pressed", String(src));
-  $("pagina").hidden = src;
-  $("fuente").hidden = !src;
+// Resalta en la página los datos de las noticias ya extraídas, según los campos activos.
+function marcarPagina() {
+  const act = activos();
+  filas.forEach((f, n) => {
+    const visto = n < mostradas;
+    f.origen.item.classList.toggle("x-visto", visto);
+    for (const c of CAMPOS) {
+      const el = f.origen[c];
+      if (el) el.classList.toggle("x-" + c, visto && act.includes(c));
+    }
+  });
+  const fin = mostradas === filas.length && filas.length > 0;
+  raiz.querySelectorAll(MEDIOS[medio].reglas.ruido).forEach((el) => el.classList.toggle("x-ruido", fin));
 }
 
-for (const id of CAMPOS) $(id).addEventListener("input", correr);
-$("medio0").addEventListener("click", () => elegirMedio(0));
-$("medio1").addEventListener("click", () => elegirMedio(1));
-$("vistaPag").addEventListener("click", () => elegirVista(false));
-$("vistaSrc").addEventListener("click", () => elegirVista(true));
-$("resolver").addEventListener("click", () => ponerSelectores(MEDIOS[medio].solucion));
-$("limpiar").addEventListener("click", () => {
-  ponerSelectores({ item: "", titular: "", enlace: "", fecha: "", seccion: "" });
-  elegirVista(true);
+function datosVisibles() {
+  const act = activos();
+  return filas.slice(0, mostradas).map((f) => {
+    const o = {};
+    for (const c of act) o[c] = f.datos[c];
+    return o;
+  });
+}
+
+function tarjeta(f, n, act) {
+  const d = document.createElement("div");
+  d.className = "tarj";
+  d.dataset.n = n;
+  const num = document.createElement("div");
+  num.className = "n";
+  num.textContent = `Noticia ${n + 1}`;
+  d.appendChild(num);
+  if (act.includes("titular")) {
+    const t = document.createElement("div");
+    t.className = "t";
+    t.textContent = f.datos.titular;
+    d.appendChild(t);
+  }
+  const chips = document.createElement("div");
+  chips.className = "chips";
+  const chip = (campo, valor, extra) => {
+    const s = document.createElement("span");
+    s.className = "chip" + (campo === "enlace" ? " mono" : "");
+    s.style.setProperty("--c", COLOR[campo]);
+    s.textContent = valor === null ? "sin dato" : valor;
+    if (extra) {
+      const sm = document.createElement("small");
+      sm.textContent = "  ← " + extra;
+      s.appendChild(sm);
+    }
+    chips.appendChild(s);
+  };
+  if (act.includes("fecha")) {
+    const cambio = f.fechaOriginal && f.fechaOriginal !== f.datos.fecha ? `«${f.fechaOriginal}»` : null;
+    chip("fecha", f.datos.fecha, cambio);
+  }
+  if (act.includes("seccion")) chip("seccion", f.datos.seccion);
+  if (act.includes("enlace")) chip("enlace", f.datos.enlace);
+  if (chips.children.length) d.appendChild(chips);
+  d.addEventListener("mouseenter", () => enfocar(n, true, true));
+  d.addEventListener("mouseleave", () => enfocar(n, false, true));
+  return d;
+}
+
+// Vuelve a dibujar el resultado completo; solo la tarjeta recién extraída entra animada.
+function pintar(nueva = -1) {
+  const act = activos();
+  marcarPagina();
+  const cont = $("resultado");
+  cont.replaceChildren();
+  if (mostradas === 0) {
+    const v = document.createElement("div");
+    v.className = "vacio";
+    v.textContent = "Aquí van a ir cayendo las noticias, ya ordenadas.";
+    cont.appendChild(v);
+  }
+  filas.slice(0, mostradas).forEach((f, n) => {
+    const t = tarjeta(f, n, act);
+    if (n !== nueva) t.style.animation = "none";
+    cont.appendChild(t);
+  });
+  if (nueva >= 0) cont.scrollTop = cont.scrollHeight;
+  $("json").textContent = JSON.stringify(datosVisibles(), null, 2);
+  $("sNotas").textContent = mostradas;
+  $("sDatos").textContent = mostradas * act.length;
+  const fin = mostradas === filas.length && filas.length > 0;
+  $("sRuido").textContent = fin ? raiz.querySelectorAll(MEDIOS[medio].reglas.ruido).length : 0;
+}
+
+// Une visualmente una tarjeta con el pedazo de página de donde salió.
+function enfocar(n, encendido, desplazar) {
+  if (n >= mostradas) return;
+  const item = filas[n].origen.item;
+  item.classList.toggle("x-foco", encendido);
+  const t = document.querySelector(`.tarj[data-n="${n}"]`);
+  if (t) t.classList.toggle("foco", encendido);
+  if (encendido && desplazar) centrar(item);
+}
+
+// Desplaza solo el recuadro de la página, sin mover la ventana del visitante.
+function centrar(item) {
+  const v = $("vista");
+  const rv = v.getBoundingClientRect(), ri = item.getBoundingClientRect();
+  v.scrollTop += ri.top - rv.top - (rv.height - ri.height) / 2;
+}
+
+async function extraer() {
+  const mio = ++turno;
+  mostradas = 0;
+  pintar();
+  $("extraer").disabled = true;
+  for (let n = 0; n < filas.length; n++) {
+    const item = filas[n].origen.item;
+    if (!sinAnimacion) {
+      centrar(item);
+      item.classList.add("x-foco");
+      await espera(430);
+      if (mio !== turno) return;
+    }
+    mostradas = n + 1;
+    pintar(n);
+    if (!sinAnimacion) {
+      await espera(330);
+      if (mio !== turno) return;
+      item.classList.remove("x-foco");
+    }
+  }
+  $("extraer").disabled = false;
+}
+
+function limpiar() {
+  turno++;
+  mostradas = 0;
+  filas.forEach((f) => f.origen.item.classList.remove("x-foco"));
+  $("vista").scrollTop = 0;
+  $("extraer").disabled = false;
+  pintar();
+}
+
+function elegirVista(v) {
+  $("verTarjetas").setAttribute("aria-pressed", String(v === "tarjetas"));
+  $("verJson").setAttribute("aria-pressed", String(v === "json"));
+  $("resultado").hidden = v !== "tarjetas";
+  $("json").hidden = v !== "json";
+}
+
+MEDIOS.forEach((m, i) => {
+  const b = document.createElement("button");
+  b.textContent = m.nombre;
+  b.addEventListener("click", () => cargarMedio(i));
+  $("medios").appendChild(b);
 });
+$("campos").addEventListener("click", (e) => {
+  const b = e.target.closest(".campo");
+  if (!b) return;
+  b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true"));
+  pintar();
+});
+$("extraer").addEventListener("click", extraer);
+$("limpiar").addEventListener("click", limpiar);
+$("verTarjetas").addEventListener("click", () => elegirVista("tarjetas"));
+$("verJson").addEventListener("click", () => elegirVista("json"));
 
-elegirMedio(0);
+cargarMedio(0);
 </script>
 </body>
 </html>
