@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Regresión lineal · Demo de Juan Pablo Moreno</title>
+<meta name="description" content="Pon puntos con clics y mira cómo se ajusta la recta de mínimos cuadrados en tiempo real.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2314213d'/%3E%3Cpath d='M12 9l11 7-11 7z' fill='%23e4572e'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<div class="topbar"><div class="wrap">
+  <a href="../../">&larr; Todas las demos</a>
+  <a class="who" href="../../">Juan Pablo Moreno Cadena</a>
+</div></div>
+
+<main class="wrap">
+  <header class="demo-head">
+    <div class="kicker">Demo · Machine learning</div>
+    <h1>Regresión lineal</h1>
+    <p>Pon puntos con clics y mira cómo la recta se ajusta al instante. Arrastra un punto lejos de los demás para ver cuánto pesa un dato atípico.</p>
+    <p class="respaldo"><b>Lo que la respalda:</b> en Claro Colombia construí un modelo para predecir la permanencia, en meses, de los empleados.</p>
+  </header>
+
+  <section class="stage">
+    <div class="board">
+      <canvas class="lienzo" id="lienzo" aria-label="Plano donde se ponen los puntos y se dibuja la recta ajustada"></canvas>
+      <p class="hint">Clic: agregar punto · Arrastrar: mover · Doble clic sobre un punto: borrarlo</p>
+    </div>
+
+    <aside class="panel">
+      <h2>Modelo</h2>
+      <div class="stats">
+        <div class="stat wide"><div class="k">Recta ajustada</div><div class="v" id="ecuacion">—</div></div>
+        <div class="stat"><div class="k">R²</div><div class="v" id="r2">—</div></div>
+        <div class="stat"><div class="k">Puntos</div><div class="v" id="n">0</div></div>
+      </div>
+
+      <h2>Opciones</h2>
+      <label class="check"><input type="checkbox" id="residuos" checked> Mostrar residuos</label>
+      <div class="btn-row">
+        <button class="btn primary" id="ejemplo">Datos de ejemplo</button>
+        <button class="btn" id="borrar">Borrar todo</button>
+      </div>
+    </aside>
+  </section>
+
+  <section class="how">
+    <h2>Cómo funciona</h2>
+    <p>La recta <code>y = a + b·x</code> se calcula con la fórmula cerrada de mínimos cuadrados: <code>b = Sxy / Sxx</code> y <code>a = ȳ − b·x̄</code>. Las líneas punteadas son los residuos, la distancia vertical entre cada dato y la predicción; la recta es la que hace mínima la suma de sus cuadrados.</p>
+    <p>El <code>R²</code> indica qué fracción de la variación de <code>y</code> explica la recta. Todo corre en tu navegador, en JavaScript escrito desde cero: no hay servidor ni librerías.</p>
+  </section>
+</main>
+
+<footer class="site"><div class="wrap">Hecho por Juan Pablo Moreno Cadena · <a href="../../">Ver las demás demos</a></div></footer>
+
+<script src="../../assets/lienzo.js"></script>
+<script src="../../assets/modelos.js"></script>
+<script>
+const ESCALA = 10; // los ejes se muestran de 0 a 10
+let puntos = [];
+let arrastrando = -1;
+
+const $ = (id) => document.getElementById(id);
+const lienzo = crearLienzo($("lienzo"), dibujar);
+
+function dibujar(ctx, w, h) {
+  cuadricula(ctx, w, h);
+  const m = regresionLineal(puntos);
+
+  if (m) {
+    if ($("residuos").checked) {
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = COLORES.soft;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      for (const p of puntos) {
+        ctx.moveTo(p.x * w, (1 - p.y) * h);
+        ctx.lineTo(p.x * w, (1 - (m.a + m.b * p.x)) * h);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.beginPath();
+    ctx.moveTo(0, (1 - m.a) * h);
+    ctx.lineTo(w, (1 - (m.a + m.b)) * h);
+    ctx.strokeStyle = COLORES.accent;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
+
+  for (const p of puntos) punto(ctx, p.x * w, (1 - p.y) * h, COLORES.teal);
+
+  if (puntos.length === 0) {
+    ctx.fillStyle = COLORES.soft;
+    ctx.font = "15px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("Haz clic aquí para poner el primer punto", w / 2, h / 2);
+  }
+  actualizarPanel(m);
+}
+
+function actualizarPanel(m) {
+  $("n").textContent = puntos.length;
+  if (!m) {
+    $("ecuacion").textContent = puntos.length < 2 ? "Faltan puntos" : "Recta vertical";
+    $("r2").textContent = "—";
+    return;
+  }
+  // a está en unidades normalizadas; se pasa a la escala 0–10 que ve el visitante.
+  const a = Math.round(m.a * ESCALA * 100) / 100 || 0; // "|| 0" evita mostrar -0.00
+  const b = Math.round(m.b * 100) / 100 || 0;
+  const corte = (a < 0 ? "−" : "") + Math.abs(a).toFixed(2);
+  $("ecuacion").textContent = `y = ${corte} ${b < 0 ? "−" : "+"} ${Math.abs(b).toFixed(2)}·x`;
+  $("r2").textContent = m.r2.toFixed(3);
+}
+
+function datosDeEjemplo() {
+  const pendiente = 0.35 + Math.random() * 0.5;
+  const corte = 0.1 + Math.random() * 0.15;
+  puntos = [];
+  for (let i = 0; i < 18; i++) {
+    const x = 0.06 + Math.random() * 0.88;
+    puntos.push({ x, y: acotar(corte + pendiente * x + normal() * 0.07) });
+  }
+  lienzo.redibujar();
+}
+
+const c = $("lienzo");
+c.addEventListener("pointerdown", (e) => {
+  const p = lienzo.aDatos(e);
+  arrastrando = masCercano(puntos, p.x, p.y, lienzo.estado.w, lienzo.estado.h);
+  if (arrastrando === -1) {
+    puntos.push(p);
+    arrastrando = puntos.length - 1;
+  }
+  c.setPointerCapture(e.pointerId);
+  lienzo.redibujar();
+});
+c.addEventListener("pointermove", (e) => {
+  if (arrastrando === -1) return;
+  puntos[arrastrando] = lienzo.aDatos(e);
+  lienzo.redibujar();
+});
+const soltar = () => { arrastrando = -1; };
+c.addEventListener("pointerup", soltar);
+c.addEventListener("pointercancel", soltar);
+c.addEventListener("dblclick", (e) => {
+  const p = lienzo.aDatos(e);
+  // El doble clic llega después de dos pointerdown: quita el punto tocado
+  // y el duplicado que el segundo clic pudo haber creado encima.
+  let i = masCercano(puntos, p.x, p.y, lienzo.estado.w, lienzo.estado.h);
+  while (i !== -1) {
+    puntos.splice(i, 1);
+    i = masCercano(puntos, p.x, p.y, lienzo.estado.w, lienzo.estado.h, 6);
+  }
+  lienzo.redibujar();
+});
+
+$("residuos").addEventListener("change", lienzo.redibujar);
+$("ejemplo").addEventListener("click", datosDeEjemplo);
+$("borrar").addEventListener("click", () => { puntos = []; lienzo.redibujar(); });
+
+datosDeEjemplo();
+</script>
+</body>
+</html>

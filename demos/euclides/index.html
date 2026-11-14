@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Euclides, Proposición I.1 · Demo de Juan Pablo Moreno</title>
+<meta name="description" content="Construcción interactiva de un triángulo equilátero con regla y compás, paso a paso.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2314213d'/%3E%3Cpath d='M12 9l11 7-11 7z' fill='%23e4572e'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<div class="topbar"><div class="wrap">
+  <a href="../../">&larr; Todas las demos</a>
+  <a class="who" href="../../">Juan Pablo Moreno Cadena</a>
+</div></div>
+
+<main class="wrap">
+  <header class="demo-head">
+    <div class="kicker">Demo · Herramientas didácticas</div>
+    <h1>Euclides, Proposición I.1</h1>
+    <p>La primera proposición de los <em>Elementos</em>: construir un triángulo equilátero sobre un segmento dado, solo con regla y compás. Avanza paso a paso y arrastra los puntos A y B: la construcción se rehace sola.</p>
+    <p class="respaldo"><b>Lo que la respalda:</b> como docente voluntario en la Konrad Lorenz desarrollé herramientas interactivas en Python con Streamlit para enseñar proposiciones de Euclides. Esta es una versión web del mismo tipo de herramienta.</p>
+  </header>
+
+  <section class="stage">
+    <div class="board">
+      <canvas class="lienzo" id="lienzo" aria-label="Construcción geométrica del triángulo equilátero sobre el segmento AB"></canvas>
+      <p class="hint">Arrastra los puntos A y B para cambiar el segmento</p>
+    </div>
+
+    <aside class="panel">
+      <h2>Paso <span id="pasoNum">1</span> de 4</h2>
+      <p id="pasoTexto"></p>
+      <div class="btn-row">
+        <button class="btn" id="atras">&larr; Atrás</button>
+        <button class="btn primary" id="siguiente">Siguiente &rarr;</button>
+      </div>
+
+      <h2>Medidas</h2>
+      <div class="stats">
+        <div class="stat"><div class="k">AB</div><div class="v" id="ab">—</div></div>
+        <div class="stat"><div class="k">AC</div><div class="v" id="ac">—</div></div>
+        <div class="stat"><div class="k">BC</div><div class="v" id="bc">—</div></div>
+        <div class="stat"><div class="k">¿Equilátero?</div><div class="v" id="eq">—</div></div>
+      </div>
+    </aside>
+  </section>
+
+  <section class="how">
+    <h2>Por qué funciona</h2>
+    <p>El punto C está sobre el círculo de centro A que pasa por B, así que <code>AC = AB</code> por ser radios del mismo círculo. También está sobre el círculo de centro B que pasa por A, así que <code>BC = BA</code>. Como dos cosas iguales a una tercera son iguales entre sí, <code>AC = BC = AB</code>: el triángulo es equilátero, sin importar dónde pongas A y B.</p>
+    <p>Las medidas del panel se calculan a partir de las coordenadas del dibujo; no están escritas a mano. Muévelo todo lo que quieras: siempre coinciden.</p>
+  </section>
+</main>
+
+<footer class="site"><div class="wrap">Hecho por Juan Pablo Moreno Cadena · <a href="../../">Ver las demás demos</a></div></footer>
+
+<script src="../../assets/lienzo.js"></script>
+<script>
+// A y B se guardan como fracción del ancho y del alto del lienzo.
+const pts = { A: { x: 0.38, y: 0.4 }, B: { x: 0.62, y: 0.4 } };
+let paso = 1;
+let arrastrando = null;
+
+const PASOS = [
+  "Partimos de un segmento AB cualquiera. Sobre él vamos a levantar el triángulo.",
+  "Con centro en A y abertura AB se traza un círculo. Todos sus puntos están a la misma distancia de A que B.",
+  "Con centro en B y la misma abertura se traza otro círculo. Los dos círculos se cortan en el punto C.",
+  "Se une C con A y con B. Los tres lados miden lo mismo: el triángulo ABC es equilátero.",
+];
+
+const $ = (id) => document.getElementById(id);
+const lienzo = crearLienzo($("lienzo"), dibujar);
+
+function etiqueta(ctx, texto, x, y, dx, dy) {
+  ctx.font = "600 16px system-ui, sans-serif";
+  ctx.fillStyle = COLORES.ink;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(texto, x + dx, y + dy);
+}
+
+function dibujar(ctx, w, h) {
+  cuadricula(ctx, w, h);
+  const A = { x: pts.A.x * w, y: (1 - pts.A.y) * h };
+  const B = { x: pts.B.x * w, y: (1 - pts.B.y) * h };
+  const r = Math.hypot(B.x - A.x, B.y - A.y);
+
+  // C: el vértice del triángulo, girando B 60° alrededor de A (hacia arriba en pantalla).
+  const ang = -Math.PI / 3;
+  const dx = B.x - A.x, dy = B.y - A.y;
+  const C = {
+    x: A.x + dx * Math.cos(ang) - dy * Math.sin(ang),
+    y: A.y + dx * Math.sin(ang) + dy * Math.cos(ang),
+  };
+
+  ctx.lineWidth = 2;
+  if (paso >= 2) {
+    ctx.beginPath(); ctx.arc(A.x, A.y, r, 0, Math.PI * 2);
+    ctx.strokeStyle = COLORES.teal; ctx.stroke();
+  }
+  if (paso >= 3) {
+    ctx.beginPath(); ctx.arc(B.x, B.y, r, 0, Math.PI * 2);
+    ctx.strokeStyle = COLORES.purple; ctx.stroke();
+  }
+  if (paso >= 4) {
+    ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(C.x, C.y); ctx.lineTo(B.x, B.y); ctx.closePath();
+    ctx.fillStyle = "rgba(228, 87, 46, 0.14)"; ctx.fill();
+    ctx.strokeStyle = COLORES.accent; ctx.lineWidth = 3; ctx.stroke();
+  }
+
+  ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y);
+  ctx.strokeStyle = COLORES.ink; ctx.lineWidth = 3; ctx.stroke();
+
+  punto(ctx, A.x, A.y, COLORES.ink, 8);
+  punto(ctx, B.x, B.y, COLORES.ink, 8);
+  etiqueta(ctx, "A", A.x, A.y, 0, 22);
+  etiqueta(ctx, "B", B.x, B.y, 0, 22);
+  if (paso >= 3) {
+    punto(ctx, C.x, C.y, COLORES.accent, 7);
+    etiqueta(ctx, "C", C.x, C.y, 0, -20);
+  }
+
+  // Medidas en unidades propias del dibujo (100 = ancho del lienzo).
+  const u = (d) => ((d / w) * 100).toFixed(1);
+  const ab = r, ac = Math.hypot(C.x - A.x, C.y - A.y), bc = Math.hypot(C.x - B.x, C.y - B.y);
+  $("ab").textContent = u(ab);
+  $("ac").textContent = paso >= 3 ? u(ac) : "—";
+  $("bc").textContent = paso >= 3 ? u(bc) : "—";
+  $("eq").textContent = paso >= 4 ? (Math.abs(ab - ac) < 1e-6 * w && Math.abs(ab - bc) < 1e-6 * w ? "Sí" : "No") : "—";
+}
+
+function fijarPaso(n) {
+  paso = Math.min(4, Math.max(1, n));
+  $("pasoNum").textContent = paso;
+  $("pasoTexto").textContent = PASOS[paso - 1];
+  $("atras").disabled = paso === 1;
+  $("siguiente").disabled = paso === 4;
+  lienzo.redibujar();
+}
+
+const c = $("lienzo");
+c.style.cursor = "grab";
+c.addEventListener("pointerdown", (e) => {
+  const p = lienzo.aDatos(e);
+  const lista = [pts.A, pts.B];
+  const i = masCercano(lista, p.x, p.y, lienzo.estado.w, lienzo.estado.h, 26);
+  if (i === -1) return;
+  arrastrando = i === 0 ? "A" : "B";
+  c.setPointerCapture(e.pointerId);
+});
+c.addEventListener("pointermove", (e) => {
+  if (!arrastrando) return;
+  const p = lienzo.aDatos(e);
+  const otro = arrastrando === "A" ? pts.B : pts.A;
+  // Evita que A y B queden uno encima del otro.
+  const w = lienzo.estado.w, h = lienzo.estado.h;
+  if (Math.hypot((p.x - otro.x) * w, (p.y - otro.y) * h) < 24) return;
+  pts[arrastrando] = p;
+  lienzo.redibujar();
+});
+const soltar = () => { arrastrando = null; };
+c.addEventListener("pointerup", soltar);
+c.addEventListener("pointercancel", soltar);
+
+$("atras").addEventListener("click", () => fijarPaso(paso - 1));
+$("siguiente").addEventListener("click", () => fijarPaso(paso + 1));
+
+fijarPaso(1);
+</script>
+</body>
+</html>

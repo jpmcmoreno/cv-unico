@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chatbot con IA · Demo de Juan Pablo Moreno</title>
+<meta name="description" content="Un chatbot corto que responde preguntas sobre el perfil de Juan Pablo, construido sobre la API de un LLM.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2314213d'/%3E%3Cpath d='M12 9l11 7-11 7z' fill='%23e4572e'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../../assets/style.css">
+<style>
+  .chat-wrap { max-width: 720px; margin: 22px 0 36px; }
+  .chat {
+    background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .chat-top {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--paper);
+    font-size: 13.5px;
+  }
+  .modo { font-family: var(--mono); font-size: 12px; padding: 3px 9px; border-radius: 999px; font-weight: 600; }
+  .modo.sim { background: #fdf0d5; color: #7a5200; border: 1px solid #e9c46a; }
+  .modo.real { background: #dff3ef; color: #1c6b61; border: 1px solid #2a9d8f; }
+  .mensajes { padding: 16px 14px; min-height: 300px; max-height: 52vh; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 84%; padding: 9px 13px; border-radius: 14px; font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .msg.bot { align-self: flex-start; background: var(--paper); border-bottom-left-radius: 4px; }
+  .msg.yo { align-self: flex-end; background: var(--ink); color: #fff; border-bottom-right-radius: 4px; }
+  .msg.error { align-self: center; background: #fdeee9; color: var(--accent-dark); font-size: 14px; }
+  .msg.fin { align-self: center; background: none; color: var(--soft); font-size: 14px; text-align: center; }
+  .entrada { border-top: 1px solid var(--line); padding: 12px 14px; }
+  .entrada textarea {
+    width: 100%; resize: none; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+    font: inherit; font-size: 15px; color: var(--ink); background: #fbfaf7;
+  }
+  .entrada-pie { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+  .entrada-pie small { color: var(--soft); font-size: 13px; }
+  .sugerencias { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+  .sugerencias button {
+    border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 5px 11px;
+    font: inherit; font-size: 13.5px; color: var(--ink); cursor: pointer;
+  }
+  .sugerencias button:hover { border-color: var(--ink); }
+</style>
+</head>
+<body>
+<div class="topbar"><div class="wrap">
+  <a href="../../">&larr; Todas las demos</a>
+  <a class="who" href="../../">Juan Pablo Moreno Cadena</a>
+</div></div>
+
+<main class="wrap">
+  <header class="demo-head">
+    <div class="kicker">Demo · IA generativa</div>
+    <h1>Chatbot con IA</h1>
+    <p>Un asistente que responde preguntas sobre mi perfil. Es una demo, así que la conversación es corta: cinco preguntas y se acaba. Para volver a usarlo, se reinicia.</p>
+    <p class="respaldo"><b>Lo que la respalda:</b> en Claro Colombia usé LLMs para clasificar respuestas abiertas de encuestas, y en Risk Consulting integré el consumo de una API en una automatización en producción.</p>
+  </header>
+
+  <div class="chat-wrap">
+    <div class="chat">
+      <div class="chat-top">
+        <span id="modo" class="modo sim">Modo simulado</span>
+        <span id="contador">Pregunta 1 de 5</span>
+      </div>
+      <div class="mensajes" id="mensajes" aria-live="polite"></div>
+      <div class="entrada">
+        <div class="sugerencias" id="sugerencias">
+          <button type="button">¿Qué experiencia tiene?</button>
+          <button type="button">¿Qué hizo en Claro?</button>
+          <button type="button">¿Qué tecnologías maneja?</button>
+          <button type="button">¿Cómo funciona este chat?</button>
+        </div>
+        <form id="form">
+          <textarea id="texto" rows="2" placeholder="Escribe tu pregunta…" aria-label="Tu pregunta"></textarea>
+          <div class="entrada-pie">
+            <small id="largo">0 / 400</small>
+            <div class="btn-row">
+              <button type="button" class="btn" id="reiniciar">Reiniciar</button>
+              <button type="submit" class="btn primary" id="enviar">Enviar</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+    <p class="hint" id="notaModo"></p>
+  </div>
+
+  <section class="how">
+    <h2>Cómo funciona</h2>
+    <p>El navegador nunca ve la llave de la API. La página envía la conversación a un proxy pequeño (un Cloudflare Worker, incluido en el repositorio), y el proxy le agrega las instrucciones del asistente y llama a la API de DeepSeek.</p>
+    <p>Los límites se aplican en el proxy, no solo en esta página: máximo 200 tokens por respuesta, preguntas de hasta 400 caracteres y cinco preguntas por conversación. Así cada visita cuesta fracciones de centavo y el gasto tiene techo.</p>
+  </section>
+</main>
+
+<footer class="site"><div class="wrap">Hecho por Juan Pablo Moreno Cadena · <a href="../../">Ver las demás demos</a></div></footer>
+
+<script src="config.js"></script>
+<script src="simulado.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const LIM = window.CHAT_LIMITES;
+const API = (window.CHAT_API_URL || "").trim();
+const SIMULADO = API === "";
+const SALUDO = "¡Hola! Soy el asistente del CV de Juan Pablo. Pregúntame por su experiencia, sus estudios o lo que sabe hacer.";
+
+let historial = [];   // [{ role: "user" | "assistant", content }]
+let ocupado = false;
+
+function preguntasHechas() { return historial.filter((m) => m.role === "user").length; }
+function terminado() { return preguntasHechas() >= LIM.preguntas && !ocupado; }
+
+function burbuja(clase, texto) {
+  const d = document.createElement("div");
+  d.className = "msg " + clase;
+  d.textContent = texto;
+  $("mensajes").appendChild(d);
+  $("mensajes").scrollTop = $("mensajes").scrollHeight;
+  return d;
+}
+
+function refrescar() {
+  const hechas = preguntasHechas();
+  const fin = terminado();
+  $("contador").textContent = fin
+    ? "Demo terminada"
+    : `Pregunta ${Math.min(hechas + 1, LIM.preguntas)} de ${LIM.preguntas}`;
+  $("texto").disabled = fin || ocupado;
+  $("enviar").disabled = fin || ocupado;
+  $("sugerencias").hidden = fin || hechas > 0;
+  $("largo").textContent = `${$("texto").value.length} / ${LIM.caracteres}`;
+}
+
+function reiniciar() {
+  historial = [];
+  ocupado = false;
+  $("mensajes").replaceChildren();
+  $("texto").value = "";
+  burbuja("bot", SALUDO);
+  refrescar();
+  $("texto").focus({ preventScroll: true });
+}
+
+// Recorta la pregunta a los límites de la demo: caracteres y número de líneas.
+function recortar(t) {
+  return t.split("\n").slice(0, LIM.lineas).join("\n").slice(0, LIM.caracteres).trim();
+}
+
+async function pedirRespuesta() {
+  if (SIMULADO) {
+    await new Promise((r) => setTimeout(r, 450 + Math.random() * 500));
+    return respuestaSimulada(historial[historial.length - 1].content);
+  }
+  const r = await fetch(API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages: historial }),
+  });
+  const datos = await r.json().catch(() => ({}));
+  if (!r.ok || typeof datos.reply !== "string" || !datos.reply.trim()) {
+    throw new Error(datos.error || "El servicio no respondió.");
+  }
+  return datos.reply.trim();
+}
+
+async function enviar(textoCrudo) {
+  const texto = recortar(textoCrudo);
+  if (!texto || ocupado || terminado()) return;
+  historial.push({ role: "user", content: texto });
+  burbuja("yo", texto);
+  $("texto").value = "";
+  ocupado = true;
+  refrescar();
+  const espera = burbuja("bot", "Escribiendo…");
+  try {
+    const respuesta = await pedirRespuesta();
+    espera.textContent = respuesta;
+    historial.push({ role: "assistant", content: respuesta });
+  } catch (e) {
+    // Si falla, la pregunta no cuenta: se quita del historial para poder reintentar.
+    espera.remove();
+    historial.pop();
+    burbuja("error", "No se pudo obtener respuesta. Intenta de nuevo en un momento.");
+  }
+  ocupado = false;
+  refrescar();
+  if (terminado()) {
+    burbuja("fin", "Hasta aquí llega la demo. Pulsa «Reiniciar» para empezar otra conversación.");
+  } else {
+    $("texto").focus({ preventScroll: true });
+  }
+}
+
+$("form").addEventListener("submit", (e) => { e.preventDefault(); enviar($("texto").value); });
+$("texto").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar($("texto").value); }
+});
+$("texto").addEventListener("input", () => {
+  const t = $("texto");
+  const lineas = t.value.split("\n");
+  if (lineas.length > LIM.lineas) t.value = lineas.slice(0, LIM.lineas).join("\n");
+  if (t.value.length > LIM.caracteres) t.value = t.value.slice(0, LIM.caracteres);
+  refrescar();
+});
+$("reiniciar").addEventListener("click", reiniciar);
+$("sugerencias").addEventListener("click", (e) => {
+  if (e.target.tagName === "BUTTON") enviar(e.target.textContent);
+});
+
+$("modo").textContent = SIMULADO ? "Modo simulado" : "En vivo · DeepSeek";
+$("modo").className = "modo " + (SIMULADO ? "sim" : "real");
+$("notaModo").textContent = SIMULADO
+  ? "Modo simulado: las respuestas son pregrabadas y se eligen por palabras clave, no las genera un modelo. La interfaz, los límites y el proxy son los reales; solo falta conectar la llave de la API."
+  : "Respuestas generadas por un modelo de DeepSeek. Pueden contener errores: para datos exactos, mira el CV.";
+
+reiniciar();
+</script>
+</body>
+</html>

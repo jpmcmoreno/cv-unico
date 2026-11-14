@@ -1,0 +1,14 @@
+# Archivos auxiliares de LaTeX
+*.aux
+*.log
+*.out
+*.synctex.gz
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Versión del CV con teléfono: solo para enviar directamente, no se publica
+cv/*con_telefono*.pdf
+cv/telefono.tex

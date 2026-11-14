@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clasificador · Demo de Juan Pablo Moreno</title>
+<meta name="description" content="Mueve los datos y observa cómo cambia la frontera de decisión de una regresión logística entrenada en tu navegador.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2314213d'/%3E%3Cpath d='M12 9l11 7-11 7z' fill='%23e4572e'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<div class="topbar"><div class="wrap">
+  <a href="../../">&larr; Todas las demos</a>
+  <a class="who" href="../../">Juan Pablo Moreno Cadena</a>
+</div></div>
+
+<main class="wrap">
+  <header class="demo-head">
+    <div class="kicker">Demo · Machine learning</div>
+    <h1>Clasificación</h1>
+    <p>Dos clases de puntos y un modelo que aprende a separarlas. Agrega, mueve o borra datos: el modelo se vuelve a entrenar cada vez y el fondo muestra qué predice en cada zona.</p>
+    <p class="respaldo"><b>Lo que la respalda:</b> en Claro Colombia desarrollé un modelo de fuga de empleados con 70&nbsp;% de precisión.</p>
+  </header>
+
+  <section class="stage">
+    <div class="board">
+      <canvas class="lienzo" id="lienzo" aria-label="Plano con los puntos de las dos clases y las zonas que predice el modelo"></canvas>
+      <p class="hint">Clic: agregar punto de la clase elegida · Arrastrar: mover · Doble clic sobre un punto: borrarlo</p>
+    </div>
+
+    <aside class="panel">
+      <h2>Clase a agregar</h2>
+      <div class="seg" role="group" aria-label="Clase a agregar">
+        <button id="claseA" aria-pressed="true"><span class="dot" style="background:#2a9d8f"></span>Verde</button>
+        <button id="claseB" aria-pressed="false"><span class="dot" style="background:#e9a23b"></span>Ámbar</button>
+      </div>
+
+      <h2>Forma de la frontera</h2>
+      <label class="field">Grado del polinomio: <span class="val" id="gradoVal">1</span>
+        <input type="range" id="grado" min="1" max="4" step="1" value="1">
+      </label>
+      <p id="gradoTexto"></p>
+
+      <h2>Modelo</h2>
+      <div class="stats">
+        <div class="stat"><div class="k">Exactitud</div><div class="v" id="exactitud">—</div></div>
+        <div class="stat"><div class="k">Puntos</div><div class="v" id="n">0</div></div>
+      </div>
+
+      <h2>Datos</h2>
+      <div class="btn-row">
+        <button class="btn primary" id="blobs">Dos grupos</button>
+        <button class="btn" id="anillo">Anillo</button>
+        <button class="btn" id="borrar">Borrar todo</button>
+      </div>
+    </aside>
+  </section>
+
+  <section class="how">
+    <h2>Cómo funciona</h2>
+    <p>Es una regresión logística entrenada con descenso de gradiente. Con grado 1 la frontera es una línea recta; al subir el grado se agregan variables polinómicas (<code>x²</code>, <code>x·y</code>, <code>y²</code>…) y la frontera puede curvarse. Prueba el botón <em>Anillo</em> con grado 1 y luego con grado 2: una recta no puede separar un círculo, una cuadrática sí.</p>
+    <p>La exactitud se mide sobre los mismos puntos con los que se entrena, así que con grados altos sube aunque el modelo esté memorizando: en un proyecto real se evalúa con datos que el modelo no ha visto. Todo corre en tu navegador, sin servidor ni librerías.</p>
+  </section>
+</main>
+
+<footer class="site"><div class="wrap">Hecho por Juan Pablo Moreno Cadena · <a href="../../">Ver las demás demos</a></div></footer>
+
+<script src="../../assets/lienzo.js"></script>
+<script src="../../assets/modelos.js"></script>
+<script>
+let puntos = [];
+let claseActual = 0;
+let grado = 1;
+let pesos = null;
+let arrastrando = -1;
+
+const $ = (id) => document.getElementById(id);
+const COLOR_CLASE = [COLORES.teal, COLORES.amber];
+const RGB_CLASE = [[42, 157, 143], [233, 162, 59]];
+const TEXTO_GRADO = {
+  1: "Frontera recta: el modelo más simple.",
+  2: "Curvas suaves: círculos, elipses, parábolas.",
+  3: "Fronteras con más de una curva.",
+  4: "Muy flexible: se adapta a casi todo, también al ruido.",
+};
+
+const lienzo = crearLienzo($("lienzo"), dibujar);
+
+function hayDosClases() {
+  return puntos.some((p) => p.c === 0) && puntos.some((p) => p.c === 1);
+}
+
+function entrenar() {
+  pesos = hayDosClases() ? entrenarLogistica(puntos, grado) : null;
+}
+
+function dibujar(ctx, w, h) {
+  if (pesos) {
+    // Mapa de probabilidad: cada celda toma el color de la clase que predice,
+    // más intenso cuanto más seguro está el modelo.
+    const nx = 64, ny = 48;
+    for (let i = 0; i < nx; i++) {
+      for (let j = 0; j < ny; j++) {
+        const p = probabilidad(pesos, (i + 0.5) / nx, 1 - (j + 0.5) / ny, grado);
+        const cls = p >= 0.5 ? 1 : 0;
+        const seguridad = Math.abs(p - 0.5) * 2;
+        const [r, g, b] = RGB_CLASE[cls];
+        ctx.fillStyle = `rgba(${r},${g},${b},${0.08 + 0.3 * seguridad})`;
+        // Bordes enteros y contiguos: sin huecos ni celdas montadas.
+        const x0 = Math.round((i * w) / nx), x1 = Math.round(((i + 1) * w) / nx);
+        const y0 = Math.round((j * h) / ny), y1 = Math.round(((j + 1) * h) / ny);
+        ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+      }
+    }
+  } else {
+    cuadricula(ctx, w, h);
+    ctx.fillStyle = COLORES.soft;
+    ctx.font = "15px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("Pon al menos un punto de cada clase", w / 2, h / 2);
+  }
+
+  for (const p of puntos) punto(ctx, p.x * w, (1 - p.y) * h, COLOR_CLASE[p.c]);
+
+  $("n").textContent = puntos.length;
+  const ex = pesos ? exactitud(pesos, puntos, grado) : null;
+  $("exactitud").textContent = ex === null ? "—" : Math.round(ex * 100) + " %";
+}
+
+function actualizar() { entrenar(); lienzo.redibujar(); }
+
+function dosGrupos() {
+  puntos = [];
+  const centros = [[0.32, 0.64], [0.68, 0.36]];
+  for (let c = 0; c < 2; c++) {
+    for (let i = 0; i < 16; i++) {
+      puntos.push({
+        x: acotar(centros[c][0] + normal() * 0.11),
+        y: acotar(centros[c][1] + normal() * 0.11),
+        c,
+      });
+    }
+  }
+  actualizar();
+}
+
+function anillo() {
+  puntos = [];
+  for (let i = 0; i < 14; i++) {
+    puntos.push({ x: acotar(0.5 + normal() * 0.06), y: acotar(0.5 + normal() * 0.06), c: 0 });
+  }
+  for (let i = 0; i < 22; i++) {
+    const t = (i / 22) * Math.PI * 2;
+    const r = 0.33 + normal() * 0.025;
+    puntos.push({ x: acotar(0.5 + r * Math.cos(t)), y: acotar(0.5 + r * Math.sin(t)), c: 1 });
+  }
+  actualizar();
+}
+
+function elegirClase(c) {
+  claseActual = c;
+  $("claseA").setAttribute("aria-pressed", String(c === 0));
+  $("claseB").setAttribute("aria-pressed", String(c === 1));
+}
+
+function fijarGrado(g) {
+  grado = g;
+  $("gradoVal").textContent = g;
+  $("gradoTexto").textContent = TEXTO_GRADO[g];
+}
+
+const c = $("lienzo");
+c.addEventListener("pointerdown", (e) => {
+  const p = lienzo.aDatos(e);
+  arrastrando = masCercano(puntos, p.x, p.y, lienzo.estado.w, lienzo.estado.h);
+  if (arrastrando === -1) {
+    puntos.push({ ...p, c: claseActual });
+    arrastrando = puntos.length - 1;
+  }
+  c.setPointerCapture(e.pointerId);
+  actualizar();
+});
+c.addEventListener("pointermove", (e) => {
+  if (arrastrando === -1) return;
+  const p = lienzo.aDatos(e);
+  puntos[arrastrando].x = p.x;
+  puntos[arrastrando].y = p.y;
+  actualizar();
+});
+const soltar = () => { arrastrando = -1; };
+c.addEventListener("pointerup", soltar);
+c.addEventListener("pointercancel", soltar);
+c.addEventListener("dblclick", (e) => {
+  const p = lienzo.aDatos(e);
+  let i = masCercano(puntos, p.x, p.y, lienzo.estado.w, lienzo.estado.h);
+  while (i !== -1) {
+    puntos.splice(i, 1);
+    i = masCercano(puntos, p.x, p.y, lienzo.estado.w, lienzo.estado.h, 6);
+  }
+  actualizar();
+});
+
+$("claseA").addEventListener("click", () => elegirClase(0));
+$("claseB").addEventListener("click", () => elegirClase(1));
+$("grado").addEventListener("input", (e) => { fijarGrado(Number(e.target.value)); actualizar(); });
+$("blobs").addEventListener("click", dosGrupos);
+$("anillo").addEventListener("click", anillo);
+$("borrar").addEventListener("click", () => { puntos = []; actualizar(); });
+
+fijarGrado(1);
+dosGrupos();
+</script>
+</body>
+</html>

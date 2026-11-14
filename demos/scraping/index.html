@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Web scraping de noticias · Demo de Juan Pablo Moreno</title>
+<meta name="description" content="Escribe selectores CSS al estilo Scrapy y mira qué datos se extraen de una página de noticias de ejemplo.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2314213d'/%3E%3Cpath d='M12 9l11 7-11 7z' fill='%23e4572e'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../../assets/style.css">
+<style>
+  .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; margin: 22px 0 18px; align-items: start; }
+  @media (max-width: 860px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
+  .tabs { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; align-items: center; }
+  iframe.pagina { width: 100%; height: 400px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+  pre.fuente { max-height: 400px; overflow: auto; white-space: pre; }
+  .sel { display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 8px; align-items: center; margin-bottom: 8px; }
+  .sel label { font-size: 13.5px; font-weight: 600; }
+  .sel input {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+    font-family: var(--mono); font-size: 13.5px; color: var(--ink); background: #fbfaf7;
+  }
+  .sel input.mal { border-color: var(--accent); background: #fdeee9; }
+  .aviso { font-size: 13.5px; margin: 6px 0 0; min-height: 1.4em; }
+  .aviso.error { color: var(--accent-dark); font-weight: 600; }
+  .aviso.ok { color: var(--teal); font-weight: 600; }
+  .tabla-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+  table.res { border-collapse: collapse; width: 100%; font-size: 13.5px; background: #fff; }
+  table.res th, table.res td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.res th { background: var(--paper); font-family: var(--mono); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--soft); }
+  table.res tr:last-child td { border-bottom: 0; }
+  table.res td.vacio { color: var(--accent-dark); font-style: italic; }
+  .bloque { margin-bottom: 18px; }
+  .bloque h2 { margin-top: 0; }
+</style>
+</head>
+<body>
+<div class="topbar"><div class="wrap">
+  <a href="../../">&larr; Todas las demos</a>
+  <a class="who" href="../../">Juan Pablo Moreno Cadena</a>
+</div></div>
+
+<main class="wrap">
+  <header class="demo-head">
+    <div class="kicker">Demo · Automatización</div>
+    <h1>Web scraping de noticias</h1>
+    <p>Cada medio organiza su página de una forma distinta. El trabajo está en encontrar los selectores que sacan el titular, el enlace y la fecha de cada nota. Aquí puedes escribirlos, romperlos y ver el resultado al instante.</p>
+    <p class="respaldo"><b>Lo que la respalda:</b> en Risk Consulting Global Group construí una automatización en Python, desplegada en la plataforma interna, que recolecta noticias con web scraping y consumo de una API externa.</p>
+  </header>
+
+  <section class="grid2">
+    <div class="panel">
+      <h2>1 · La página a leer</h2>
+      <div class="tabs">
+        <div class="seg" role="group" aria-label="Medio de ejemplo">
+          <button id="medio0" aria-pressed="true">El Faro Andino</button>
+          <button id="medio1" aria-pressed="false">Radio Sabana</button>
+        </div>
+        <div class="seg" role="group" aria-label="Vista">
+          <button id="vistaPag" aria-pressed="true">Página</button>
+          <button id="vistaSrc" aria-pressed="false">HTML</button>
+        </div>
+      </div>
+      <iframe class="pagina" id="pagina" sandbox="" title="Página de noticias de ejemplo"></iframe>
+      <pre class="code fuente" id="fuente" hidden></pre>
+      <p class="hint">Son dos medios inventados para esta demo: las noticias no son reales. Tienen estructuras distintas a propósito.</p>
+    </div>
+
+    <div class="panel">
+      <h2>2 · Los selectores</h2>
+      <div class="sel"><label for="sItem">Cada nota</label><input id="sItem" spellcheck="false" autocomplete="off"></div>
+      <div class="sel"><label for="sTitulo">Titular</label><input id="sTitulo" spellcheck="false" autocomplete="off"></div>
+      <div class="sel"><label for="sEnlace">Enlace</label><input id="sEnlace" spellcheck="false" autocomplete="off"></div>
+      <div class="sel"><label for="sFecha">Fecha</label><input id="sFecha" spellcheck="false" autocomplete="off"></div>
+      <div class="sel"><label for="sSeccion">Sección</label><input id="sSeccion" spellcheck="false" autocomplete="off"></div>
+      <div class="btn-row" style="margin-top:12px">
+        <button class="btn primary" id="resolver">Poner los correctos</button>
+        <button class="btn" id="limpiar">Empezar en blanco</button>
+      </div>
+      <p class="aviso" id="aviso" role="status"></p>
+      <p class="hint" style="margin-left:0">Sintaxis de Scrapy: <code>::text</code> saca el texto y <code>::attr(href)</code> un atributo. Los cuatro últimos selectores se buscan dentro de cada nota.</p>
+    </div>
+  </section>
+
+  <section class="panel bloque">
+    <h2>3 · Lo que se extrae</h2>
+    <div class="tabla-wrap">
+      <table class="res">
+        <thead><tr><th>#</th><th>titular</th><th>enlace</th><th>fecha</th><th>seccion</th></tr></thead>
+        <tbody id="filas"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel bloque">
+    <h2>4 · El mismo scraper en Scrapy</h2>
+    <pre class="code" id="codigo"></pre>
+  </section>
+
+  <section class="how">
+    <h2>Cómo funciona</h2>
+    <p>El navegador analiza el HTML de ejemplo y aplica tus selectores con <code>querySelectorAll</code>, igual que Scrapy aplica <code>response.css()</code> sobre la respuesta de un servidor. El bloque de código muestra el <em>spider</em> equivalente con los selectores que tengas escritos en ese momento.</p>
+    <p>Dos diferencias con un scraper real: esta demo lee una página guardada en lugar de pedirla por la red (un navegador no puede leer otros sitios por seguridad), y <code>::text</code> aquí devuelve todo el texto del elemento, mientras que en Scrapy devuelve solo el texto directo. El código de la empresa no se publica; esto muestra la técnica.</p>
+  </section>
+</main>
+
+<footer class="site"><div class="wrap">Hecho por Juan Pablo Moreno Cadena · <a href="../../">Ver las demás demos</a></div></footer>
+
+<script src="scraping.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const CAMPOS = ["sItem", "sTitulo", "sEnlace", "sFecha", "sSeccion"];
+let medio = 0;
+
+function leerSelectores() {
+  return {
+    item: $("sItem").value,
+    titular: $("sTitulo").value,
+    enlace: $("sEnlace").value,
+    fecha: $("sFecha").value,
+    seccion: $("sSeccion").value,
+  };
+}
+
+function ponerSelectores(s) {
+  $("sItem").value = s.item;
+  $("sTitulo").value = s.titular;
+  $("sEnlace").value = s.enlace;
+  $("sFecha").value = s.fecha;
+  $("sSeccion").value = s.seccion;
+  correr();
+}
+
+function correr() {
+  const sel = leerSelectores();
+  const doc = new DOMParser().parseFromString(MEDIOS[medio].html, "text/html");
+  const r = extraerNoticias(doc, sel);
+
+  const mapa = { item: "sItem", titular: "sTitulo", enlace: "sEnlace", fecha: "sFecha", seccion: "sSeccion" };
+  for (const id of CAMPOS) $(id).classList.remove("mal");
+  for (const campo of r.invalidos) $(mapa[campo]).classList.add("mal");
+
+  const cuerpo = $("filas");
+  cuerpo.replaceChildren();
+  r.filas.forEach((f, i) => {
+    const tr = document.createElement("tr");
+    const celdas = [String(i + 1), f.titular, f.enlace, f.fecha, f.seccion];
+    celdas.forEach((v, j) => {
+      const td = document.createElement("td");
+      if (v === null || v === "") { td.textContent = "sin dato"; td.className = "vacio"; }
+      else td.textContent = v;
+      if (j === 0) td.className = "";
+      tr.appendChild(td);
+    });
+    cuerpo.appendChild(tr);
+  });
+  if (!r.filas.length) {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 5;
+    td.className = "vacio";
+    td.textContent = "Todavía no se extrae ninguna nota.";
+    tr.appendChild(td);
+    cuerpo.appendChild(tr);
+  }
+
+  const aviso = $("aviso");
+  const total = MEDIOS[medio].total;
+  const completas = r.filas.filter((f) => f.titular && f.enlace && f.fecha && f.seccion).length;
+  if (r.invalidos.length) {
+    aviso.className = "aviso error";
+    aviso.textContent = "Hay un selector con sintaxis inválida (marcado en rojo).";
+  } else if (!sel.item.trim()) {
+    aviso.className = "aviso";
+    aviso.textContent = "Escribe el selector que identifica cada nota.";
+  } else if (r.filas.length === total && completas === total) {
+    aviso.className = "aviso ok";
+    aviso.textContent = `Listo: ${total} de ${total} notas con todos sus campos.`;
+  } else {
+    aviso.className = "aviso";
+    aviso.textContent = `${r.filas.length} elementos encontrados, ${completas} con todos los campos. La página tiene ${total} notas.`;
+  }
+
+  $("codigo").textContent = codigoScrapy(MEDIOS[medio], sel);
+}
+
+function elegirMedio(i) {
+  medio = i;
+  $("medio0").setAttribute("aria-pressed", String(i === 0));
+  $("medio1").setAttribute("aria-pressed", String(i === 1));
+  $("pagina").srcdoc = MEDIOS[i].html;
+  $("fuente").textContent = MEDIOS[i].html.trim();
+  ponerSelectores(MEDIOS[i].solucion);
+}
+
+function elegirVista(src) {
+  $("vistaPag").setAttribute("aria-pressed", String(!src));
+  $("vistaSrc").setAttribute("aria-pressed", String(src));
+  $("pagina").hidden = src;
+  $("fuente").hidden = !src;
+}
+
+for (const id of CAMPOS) $(id).addEventListener("input", correr);
+$("medio0").addEventListener("click", () => elegirMedio(0));
+$("medio1").addEventListener("click", () => elegirMedio(1));
+$("vistaPag").addEventListener("click", () => elegirVista(false));
+$("vistaSrc").addEventListener("click", () => elegirVista(true));
+$("resolver").addEventListener("click", () => ponerSelectores(MEDIOS[medio].solucion));
+$("limpiar").addEventListener("click", () => {
+  ponerSelectores({ item: "", titular: "", enlace: "", fecha: "", seccion: "" });
+  elegirVista(true);
+});
+
+elegirMedio(0);
+</script>
+</body>
+</html>

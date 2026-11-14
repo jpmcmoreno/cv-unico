@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clustering · Demo de Juan Pablo Moreno</title>
+<meta name="description" content="Elige el número de grupos y mira cómo k-means reagrupa los puntos, paso a paso.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2314213d'/%3E%3Cpath d='M12 9l11 7-11 7z' fill='%23e4572e'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<div class="topbar"><div class="wrap">
+  <a href="../../">&larr; Todas las demos</a>
+  <a class="who" href="../../">Juan Pablo Moreno Cadena</a>
+</div></div>
+
+<main class="wrap">
+  <header class="demo-head">
+    <div class="kicker">Demo · Machine learning</div>
+    <h1>Clustering</h1>
+    <p>Aquí nadie le dice al modelo a qué grupo pertenece cada punto: los descubre solo. Elige cuántos grupos buscar y mira cómo se reorganizan.</p>
+    <p class="respaldo"><b>Lo que la respalda:</b> en Claro Colombia agrupé perfiles de liderazgo con métodos de clustering.</p>
+  </header>
+
+  <section class="stage">
+    <div class="board">
+      <canvas class="lienzo" id="lienzo" aria-label="Plano con los puntos coloreados según el grupo asignado y los centroides"></canvas>
+      <p class="hint">Clic: agregar punto · Doble clic sobre un punto: borrarlo · Los rombos son los centroides</p>
+    </div>
+
+    <aside class="panel">
+      <h2>Número de grupos</h2>
+      <label class="field">k = <span class="val" id="kVal">3</span>
+        <input type="range" id="k" min="1" max="6" step="1" value="3">
+      </label>
+
+      <h2>Algoritmo</h2>
+      <div class="btn-row">
+        <button class="btn primary" id="agrupar">Agrupar</button>
+        <button class="btn" id="paso">Un paso</button>
+        <button class="btn" id="reiniciar">Reiniciar centroides</button>
+      </div>
+
+      <h2>Resultado</h2>
+      <div class="stats">
+        <div class="stat"><div class="k">Iteraciones</div><div class="v" id="iter">0</div></div>
+        <div class="stat"><div class="k">Estado</div><div class="v" id="estado">—</div></div>
+        <div class="stat wide"><div class="k">Inercia (suma de distancias² al centroide)</div><div class="v" id="inercia">—</div></div>
+      </div>
+
+      <h2>Datos</h2>
+      <div class="btn-row">
+        <button class="btn" id="nuevos">Datos nuevos</button>
+        <button class="btn" id="borrar">Borrar todo</button>
+      </div>
+    </aside>
+  </section>
+
+  <section class="how">
+    <h2>Cómo funciona</h2>
+    <p>Es k-means. Repite dos pasos hasta que nada cambia: asignar cada punto al centroide más cercano y mover cada centroide al promedio de sus puntos. Con <em>Un paso</em> puedes verlo avanzar iteración por iteración.</p>
+    <p>Los centroides iniciales se eligen con k-means++, que los reparte lejos unos de otros. Aun así el resultado depende del punto de partida: usa <em>Reiniciar centroides</em> varias veces y verás que a veces llega a agrupaciones distintas. La inercia siempre baja al subir k, por eso no sirve sola para elegir el número de grupos.</p>
+  </section>
+</main>
+
+<footer class="site"><div class="wrap">Hecho por Juan Pablo Moreno Cadena · <a href="../../">Ver las demás demos</a></div></footer>
+
+<script src="../../assets/lienzo.js"></script>
+<script src="../../assets/modelos.js"></script>
+<script>
+let puntos = [];
+let k = 3;
+let centroides = [];
+let grupo = [];
+let iteraciones = 0;
+let convergio = false;
+let reloj = null;
+
+const $ = (id) => document.getElementById(id);
+const PALETA = [COLORES.teal, COLORES.amber, COLORES.purple, COLORES.blue, COLORES.rose, COLORES.green];
+const lienzo = crearLienzo($("lienzo"), dibujar);
+
+function dibujar(ctx, w, h) {
+  cuadricula(ctx, w, h);
+
+  // Línea tenue de cada punto a su centroide.
+  if (centroides.length) {
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    ctx.lineWidth = 1;
+    puntos.forEach((p, i) => {
+      const q = centroides[grupo[i]];
+      if (!q) return;
+      ctx.strokeStyle = PALETA[grupo[i]];
+      ctx.beginPath();
+      ctx.moveTo(p.x * w, (1 - p.y) * h);
+      ctx.lineTo(q.x * w, (1 - q.y) * h);
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
+
+  puntos.forEach((p, i) => {
+    const color = centroides.length ? PALETA[grupo[i]] : COLORES.soft;
+    punto(ctx, p.x * w, (1 - p.y) * h, color, 5.5);
+  });
+
+  centroides.forEach((q, j) => {
+    const x = q.x * w, y = (1 - q.y) * h, r = 11;
+    ctx.beginPath();
+    ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y);
+    ctx.closePath();
+    ctx.fillStyle = PALETA[j];
+    ctx.fill();
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = COLORES.ink;
+    ctx.stroke();
+  });
+
+  if (!puntos.length) {
+    ctx.fillStyle = COLORES.soft;
+    ctx.font = "15px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("Haz clic para poner puntos", w / 2, h / 2);
+  }
+
+  $("iter").textContent = iteraciones;
+  $("estado").textContent = !centroides.length ? "—" : convergio ? "Estable" : "En curso";
+  $("inercia").textContent = centroides.length ? inercia(puntos, centroides, grupo).toFixed(3) : "—";
+}
+
+function detener() {
+  if (reloj) { clearInterval(reloj); reloj = null; }
+}
+
+function reiniciar() {
+  detener();
+  centroides = iniciarCentroides(puntos, k);
+  grupo = centroides.length ? asignar(puntos, centroides) : [];
+  iteraciones = 0;
+  convergio = false;
+  lienzo.redibujar();
+}
+
+function unPaso() {
+  if (!centroides.length || convergio) return false;
+  const r = pasoKMeans(puntos, centroides);
+  centroides = r.centroides;
+  grupo = r.grupo;
+  if (r.movido) iteraciones++; else convergio = true;
+  lienzo.redibujar();
+  return r.movido;
+}
+
+function agrupar() {
+  detener();
+  if (convergio) reiniciar();
+  reloj = setInterval(() => { if (!unPaso()) detener(); }, 320);
+}
+
+function datosNuevos() {
+  const nGrupos = 3 + Math.floor(Math.random() * 2);
+  puntos = [];
+  for (let g = 0; g < nGrupos; g++) {
+    const cx = 0.18 + Math.random() * 0.64;
+    const cy = 0.18 + Math.random() * 0.64;
+    const disp = 0.045 + Math.random() * 0.035;
+    for (let i = 0; i < 16; i++) {
+      puntos.push({ x: acotar(cx + normal() * disp), y: acotar(cy + normal() * disp) });
+    }
+  }
+  reiniciar();
+  agrupar();
+}
+
+const c = $("lienzo");
+c.addEventListener("click", (e) => {
+  if (e.detail > 1) return; // el segundo clic de un doble clic no agrega nada
+  const p = lienzo.aDatos(e);
+  if (masCercano(puntos, p.x, p.y, lienzo.estado.w, lienzo.estado.h, 8) !== -1) return;
+  puntos.push(p);
+  // Con los centroides actuales basta reasignar; el visitante decide si reagrupar.
+  if (centroides.length) { grupo = asignar(puntos, centroides); convergio = false; }
+  else reiniciar();
+  lienzo.redibujar();
+});
+c.addEventListener("dblclick", (e) => {
+  const p = lienzo.aDatos(e);
+  const i = masCercano(puntos, p.x, p.y, lienzo.estado.w, lienzo.estado.h);
+  if (i === -1) return;
+  puntos.splice(i, 1);
+  reiniciar();
+  agrupar();
+});
+
+$("k").addEventListener("input", (e) => {
+  k = Number(e.target.value);
+  $("kVal").textContent = k;
+  reiniciar();
+  agrupar();
+});
+$("agrupar").addEventListener("click", agrupar);
+$("paso").addEventListener("click", () => { detener(); unPaso(); });
+$("reiniciar").addEventListener("click", reiniciar);
+$("nuevos").addEventListener("click", datosNuevos);
+$("borrar").addEventListener("click", () => { puntos = []; reiniciar(); });
+
+datosNuevos();
+</script>
+</body>
+</html>
